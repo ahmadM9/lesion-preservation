@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lesion-preservation"
+version = "0.0.1"
+description = "The Lesion Preservation Test: are small brain lesions still visible after accelerated MRI reconstruction?"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Ahmad Mohammad" }]
+# floor from torch 2.11.0 on pypi; development and ci run on 3.13
+requires-python = ">=3.10"
+# floors only; exact versions are in requirements-lock.txt, matched to colab
+dependencies = [
+    "numpy>=2.1.3",
+    "scikit-image>=0.25.2",
+    "h5py>=3.14.0",
+    "PyYAML>=6.0.3",
+    "torch>=2.11.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["requires_data: needs the fastMRI brain files, skipped when they are absent"]
