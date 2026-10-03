@@ -21,7 +21,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+# fastmri is the reference the tests compare against; it imports requests without declaring it
+dev = ["pytest", "ruff", "fastmri==0.3.0", "requests"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
