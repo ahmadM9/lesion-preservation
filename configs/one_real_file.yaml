@@ -1,0 +1,17 @@
+# one_real_file: checks the data slot on one real fastMRI brain file by eye; answers nothing else
+name: one_real_file
+files: [file_brain_AXFLAIR_200_6002469]
+mask:
+  name: random
+  # test value only; the pilot value is taken from fastmri's settings, checked in its code
+  centre_fraction: 0.08
+  seed: 0
+speedups: [1, 4]
+methods: [zero_filled]
+judge:
+  name: placeholder
+  # test values only; nothing the placeholder judge outputs is reported
+  params: {ring_width: 2, threshold: 1.5}
+ssim_window: 7
+# one picture per item: reference and reconstruction side by side, boxes outlined
+examples: {save: true, scale: 3}
