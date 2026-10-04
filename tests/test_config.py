@@ -34,6 +34,12 @@ def test_missing_nested_key_fails(tmp_path):
         load_config(path)
 
 
+def test_missing_examples_key_fails(tmp_path):
+    path = write_changed(tmp_path, lambda raw: raw["examples"].pop("scale"))
+    with pytest.raises(KeyError, match="scale"):
+        load_config(path)
+
+
 def test_unknown_key_fails(tmp_path):
     path = write_changed(tmp_path, lambda raw: raw.update(speedup=[2]))
     with pytest.raises(KeyError, match="unknown"):

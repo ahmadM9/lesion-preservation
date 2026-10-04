@@ -13,3 +13,5 @@ judge:
   # test values only; nothing the placeholder judge outputs is reported
   params: {ring_width: 2, threshold: 1.5}
 ssim_window: 7
+# one picture per item: reference and reconstruction side by side, boxes outlined
+examples: {save: true, scale: 4}

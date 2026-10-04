@@ -45,6 +45,8 @@ def test_run_folder_contents(smoke_run):
     run_dir, _, _ = smoke_run
     for name in ["config.yaml", "code_version.txt", "run_record.yaml", "masks.npz"]:
         assert (run_dir / name).exists()
+    examples = sorted(p.name for p in (run_dir / "examples").iterdir())
+    assert examples == [f"{FAKE_STEM}_s{SPOT_SLICE}_{s}x_zero_filled.png" for s in (1, 2, 4, 8)]
     (session,) = yaml.safe_load((run_dir / "run_record.yaml").read_text())
     assert session["runtime"].count(":") == 2
 

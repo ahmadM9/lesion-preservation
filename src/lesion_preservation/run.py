@@ -14,6 +14,7 @@ import yaml
 
 from lesion_preservation.config import Config, load_config
 from lesion_preservation.data import load_slices
+from lesion_preservation.examples import save_example
 from lesion_preservation.judge import get_judge
 from lesion_preservation.masks import apply_mask, effective_speedup, get_mask
 from lesion_preservation.metrics import box_scores, nmse, psnr, ssim
@@ -192,6 +193,11 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                                     "box_nmse": scores["nmse"],
                                 }  # fmt: skip
                             )
+                        if cfg.examples.save:
+                            save_example(
+                                s.reference, image, s.boxes, data_range, cfg.examples.scale,
+                                run_dir / "examples" / f"{stem}_s{s.index}_{speedup:g}x_{name}.png",
+                            )  # fmt: skip
                         # an item's rows go out together, so a crash loses one item at most
                         writer.writerows(rows)
                         f.flush()
