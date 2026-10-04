@@ -15,3 +15,14 @@ judge:
 ssim_window: 7
 # one picture per item: reference and reconstruction side by side, boxes outlined
 examples: {save: true, scale: 4}
+# lesions are 3d connected components of the filled boxes; size is the longest box side
+lesions:
+  label: Nonspecific white matter lesion
+  contrast: AXFLAIR
+  # voxels touching by face, edge or corner, as in isles'22 and brats 2023; 6 (face) reported beside
+  connectivity: 26
+  connectivity_variant: 6
+  # inclusive pixel bounds: <=7, 8-16, >16 (DECISIONS.md 2026-10-03 evening)
+  size_upper_bounds: [7, 16]
+  # about the 90th percentile of the longest box side; flagged, not dropped
+  large_box_px: 51

@@ -7,9 +7,13 @@ import numpy as np
 import pytest
 
 from conftest import DATA_ENV
+from lesion_preservation.config import load_config
 from lesion_preservation.data import RECONSTRUCTION_KEY, load_slices
+from lesion_preservation.lesions import boxes_from_labels, lesion_table
 
 pytestmark = pytest.mark.requires_data
+
+SMOKE = Path(__file__).parents[1] / "configs" / "smoke.yaml"
 
 
 def data_dir():
@@ -44,3 +48,13 @@ def test_boxes_inside_image():
             for box in s.boxes:
                 assert 0 <= box.row and box.row + box.height <= rows, (h5_path.stem, box)
                 assert 0 <= box.col and box.col + box.width <= cols, (h5_path.stem, box)
+
+
+@pytest.mark.parametrize("connectivity, total, single", [(26, 851, 616), (6, 870, 625)])
+def test_lesion_count_on_brain_csv(connectivity, total, single):
+    # fastmri+ brain.csv: 1,699 flair white matter boxes give these counts
+    cfg = load_config(SMOKE).lesions
+    boxes = boxes_from_labels(data_dir() / "brain.csv", cfg.label, cfg.contrast)
+    lesions = lesion_table(boxes, cfg, connectivity)
+    assert len(lesions) == total
+    assert sum(lesion.num_boxes == 1 for lesion in lesions) == single

@@ -29,6 +29,16 @@ class ExamplesConfig:
 
 
 @dataclass(frozen=True)
+class LesionsConfig:
+    label: str
+    contrast: str
+    connectivity: int
+    connectivity_variant: int
+    size_upper_bounds: tuple[int, ...]
+    large_box_px: int
+
+
+@dataclass(frozen=True)
 class Config:
     name: str
     files: tuple[str, ...]
@@ -38,6 +48,7 @@ class Config:
     judge: JudgeConfig
     ssim_window: int
     examples: ExamplesConfig
+    lesions: LesionsConfig
 
 
 def _check_keys(section: dict, keys: set[str], where: str) -> None:
@@ -58,6 +69,7 @@ def load_config(path: str | Path) -> Config:
     _check_keys(raw["mask"], set(MaskConfig.__dataclass_fields__), f"{path}: mask")
     _check_keys(raw["judge"], set(JudgeConfig.__dataclass_fields__), f"{path}: judge")
     _check_keys(raw["examples"], set(ExamplesConfig.__dataclass_fields__), f"{path}: examples")
+    _check_keys(raw["lesions"], set(LesionsConfig.__dataclass_fields__), f"{path}: lesions")
 
     cfg = Config(
         name=raw["name"],
@@ -68,7 +80,13 @@ def load_config(path: str | Path) -> Config:
         judge=JudgeConfig(**raw["judge"]),
         ssim_window=raw["ssim_window"],
         examples=ExamplesConfig(**raw["examples"]),
+        lesions=LesionsConfig(
+            **raw["lesions"] | {"size_upper_bounds": tuple(raw["lesions"]["size_upper_bounds"])}
+        ),
     )
+    for key in ("connectivity", "connectivity_variant"):
+        if getattr(cfg.lesions, key) not in (6, 18, 26):
+            raise ValueError(f"{path}: lesions {key} must be 6, 18 or 26")
     # resolve every name now, so a wrong one fails before the run starts
     get_mask(cfg.mask.name)
     for method in cfg.methods:
