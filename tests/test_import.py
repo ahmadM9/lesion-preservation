@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "module", ["lesion_preservation", "numpy", "skimage", "h5py", "yaml", "torch"]
+    "module", ["lesion_preservation", "numpy", "skimage", "h5py", "yaml", "torch", "matplotlib"]
 )
 def test_import(module):
     importlib.import_module(module)
