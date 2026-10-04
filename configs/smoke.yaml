@@ -1,0 +1,15 @@
+# smoke: the whole pipeline on the fake scan from the tests, in seconds; answers nothing
+name: smoke
+files: [file_brain_AXFLAIR_000_0000000]
+mask:
+  name: random
+  # test value only; the pilot value is taken from fastmri's settings, checked in its code
+  centre_fraction: 0.08
+  seed: 0
+speedups: [1, 2, 4, 8]
+methods: [zero_filled]
+judge:
+  name: placeholder
+  # test values only; nothing the placeholder judge outputs is reported
+  params: {ring_width: 2, threshold: 1.5}
+ssim_window: 7

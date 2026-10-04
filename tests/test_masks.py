@@ -5,7 +5,7 @@ from fastmri.data.subsample import RandomMaskFunc
 from fastmri.data.transforms import apply_mask as fm_apply_mask
 from fastmri.data.transforms import to_tensor
 
-from lesion_preservation.masks import apply_mask, effective_speedup, random_mask
+from lesion_preservation.masks import apply_mask, effective_speedup, get_mask, random_mask
 
 
 def fastmri_mask(num_cols, speedup, center_fraction, seed):
@@ -54,3 +54,8 @@ def test_apply_mask_matches_fastmri():
 
 def test_effective_speedup():
     assert effective_speedup(np.array([True, False, False, True, False, False])) == 3.0
+
+
+def test_unknown_mask_name_fails():
+    with pytest.raises(KeyError, match="random"):
+        get_mask("equispaced")

@@ -25,3 +25,12 @@ def apply_mask(kspace: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 def effective_speedup(mask: np.ndarray) -> float:
     return mask.size / int(mask.sum())
+
+
+MASKS = {"random": random_mask}
+
+
+def get_mask(name: str):
+    if name not in MASKS:
+        raise KeyError(f"unknown mask {name!r}; known: {sorted(MASKS)}")
+    return MASKS[name]
