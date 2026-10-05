@@ -34,18 +34,17 @@ def hms(seconds: float, millis: bool = False) -> str:
     return text + f".{int((seconds - whole) * 1000):03d}" if millis else text
 
 
-def code_version() -> str:
-    # commit of the pipeline checkout, plus "dirty" when it has uncommitted changes
-    here = Path(__file__).parent
+def repo_version(folder: Path) -> str:
+    # commit of the checkout holding folder, plus "dirty" when it has uncommitted changes
     try:
         commit = subprocess.run(
-            ["git", "-C", str(here), "rev-parse", "HEAD"],
+            ["git", "-C", str(folder), "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
         status = subprocess.run(
-            ["git", "-C", str(here), "status", "--porcelain"],
+            ["git", "-C", str(folder), "status", "--porcelain"],
             capture_output=True,
             text=True,
             check=True,
@@ -53,6 +52,13 @@ def code_version() -> str:
     except (OSError, subprocess.CalledProcessError):
         return "not a git checkout"
     return f"{commit} dirty" if status else commit
+
+
+def code_version(config_path: Path) -> str:
+    # the config may live in a study repo beside the pipeline, so both commits are kept
+    pipeline = repo_version(Path(__file__).parent)
+    config = repo_version(config_path.resolve().parent)
+    return f"pipeline: {pipeline}\nconfig: {config}"
 
 
 def sha256(path: Path) -> str:
@@ -76,7 +82,7 @@ def start_run(config_path: Path, runs_dir: Path | None, resume: Path | None) -> 
         if load_config(run_dir / "config.yaml") != load_config(config_path):
             raise ValueError(f"{config_path} differs from the config in {run_dir}")
         recorded = (run_dir / "code_version.txt").read_text().strip()
-        if recorded != code_version():
+        if recorded != code_version(config_path):
             raise ValueError(f"code changed since {run_dir} started: was {recorded}")
         return run_dir
     if runs_dir is None:
@@ -84,7 +90,7 @@ def start_run(config_path: Path, runs_dir: Path | None, resume: Path | None) -> 
     run_dir = runs_dir / f"{date.today().isoformat()}_{load_config(config_path).name}"
     run_dir.mkdir(parents=True)  # fails if the folder exists: runs are never overwritten
     shutil.copyfile(config_path, run_dir / "config.yaml")
-    (run_dir / "code_version.txt").write_text(code_version() + "\n")
+    (run_dir / "code_version.txt").write_text(code_version(config_path) + "\n")
     return run_dir
 
 

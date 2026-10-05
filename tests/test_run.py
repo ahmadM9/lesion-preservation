@@ -1,5 +1,7 @@
 import csv
 import math
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -76,3 +78,42 @@ def test_resume_with_changed_config_fails(smoke_run, tmp_path):
     changed.write_text(yaml.safe_dump(raw))
     with pytest.raises(ValueError, match="differs"):
         run(changed, h5_path.parent, csv_path, resume=run_dir)
+
+
+def git(folder, *args):
+    # identity given per call, so no git config file is changed
+    subprocess.run(
+        ["git", "-C", str(folder), "-c", "user.name=test", "-c", "user.email=test@test", *args],
+        capture_output=True,
+        check=True,
+    )
+
+
+def test_code_version_names_both_repos(smoke_run):
+    run_dir, _, _ = smoke_run
+    lines = (run_dir / "code_version.txt").read_text().splitlines()
+    assert [line.split(": ")[0] for line in lines] == ["pipeline", "config"]
+
+
+def test_config_outside_git(fake_scan, tmp_path):
+    h5_path, csv_path = fake_scan
+    config = tmp_path / "plain" / "smoke.yaml"
+    config.parent.mkdir()
+    shutil.copyfile(SMOKE, config)
+    run_dir = run(config, h5_path.parent, csv_path, runs_dir=tmp_path / "runs")
+    lines = (run_dir / "code_version.txt").read_text().splitlines()
+    assert lines[1] == "config: not a git checkout"
+
+
+def test_resume_after_config_repo_change_fails(fake_scan, tmp_path):
+    h5_path, csv_path = fake_scan
+    repo = tmp_path / "study"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    shutil.copyfile(SMOKE, repo / "smoke.yaml")
+    git(repo, "add", "smoke.yaml")
+    git(repo, "commit", "-q", "-m", "add config")
+    run_dir = run(repo / "smoke.yaml", h5_path.parent, csv_path, runs_dir=tmp_path / "runs")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "move on")
+    with pytest.raises(ValueError, match="code changed"):
+        run(repo / "smoke.yaml", h5_path.parent, csv_path, resume=run_dir)
