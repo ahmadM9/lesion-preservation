@@ -117,3 +117,13 @@ def test_resume_after_config_repo_change_fails(fake_scan, tmp_path):
     git(repo, "commit", "-q", "--allow-empty", "-m", "move on")
     with pytest.raises(ValueError, match="code changed"):
         run(repo / "smoke.yaml", h5_path.parent, csv_path, resume=run_dir)
+
+
+def test_other_labels_not_scored(fake_scan, tmp_path):
+    h5_path, csv_path = fake_scan
+    lines = csv_path.read_text().splitlines()
+    other = lines[-1].replace("Nonspecific white matter lesion", "Posttreatment change")
+    csv_path.write_text("\n".join([*lines, other]) + "\n")
+    rows = read_rows(run(SMOKE, h5_path.parent, csv_path, runs_dir=tmp_path / "runs"))
+    assert len(rows) == 4
+    assert {r["label"] for r in rows} == {"Nonspecific white matter lesion"}

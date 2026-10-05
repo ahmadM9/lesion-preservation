@@ -150,7 +150,9 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
             writer.writeheader()
         for stem in cfg.files:
             for s in load_slices(data_dir / f"{stem}.h5", labels_csv):
-                if not s.boxes:
+                # only the config's lesion label is scored, not every label in the file
+                boxes = [b for b in s.boxes if b.label == cfg.lesions.label]
+                if not boxes:
                     continue
                 data_range = float(s.reference.max())
                 for speedup in cfg.speedups:
@@ -181,7 +183,7 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                             "recon_time": hms(recon_time, millis=True),
                         }  # fmt: skip
                         rows = []
-                        for box, verdict in zip(s.boxes, judge(image, s.boxes), strict=True):
+                        for box, verdict in zip(boxes, judge(image, boxes), strict=True):
                             scores = box_scores(s.reference, image, ssim_map, box, data_range)
                             rows.append(
                                 common
@@ -201,7 +203,7 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                             )
                         if cfg.examples.save:
                             save_example(
-                                s.reference, image, s.boxes, data_range, cfg.examples.scale,
+                                s.reference, image, boxes, data_range, cfg.examples.scale,
                                 run_dir / "examples" / f"{stem}_s{s.index}_{speedup:g}x_{name}.png",
                             )  # fmt: skip
                         # an item's rows go out together, so a crash loses one item at most
