@@ -87,6 +87,10 @@ def load_config(path: str | Path) -> Config:
     for key in ("connectivity", "connectivity_variant"):
         if getattr(cfg.lesions, key) not in (6, 18, 26):
             raise ValueError(f"{path}: lesions {key} must be 6, 18 or 26")
+    # files are chosen by hand, so one of the wrong contrast is an error, not a silent skip
+    wrong = [f for f in cfg.files if f"_{cfg.lesions.contrast}_" not in f]
+    if wrong:
+        raise ValueError(f"{path}: files not of contrast {cfg.lesions.contrast}: {wrong}")
     # resolve every name now, so a wrong one fails before the run starts
     get_mask(cfg.mask.name)
     for method in cfg.methods:

@@ -68,3 +68,9 @@ def test_wrong_judge_params_fail(tmp_path):
     path = write_changed(tmp_path, lambda raw: raw["judge"]["params"].pop("threshold"))
     with pytest.raises(KeyError, match="judge params"):
         load_config(path)
+
+
+def test_file_of_other_contrast_fails(tmp_path):
+    path = write_changed(tmp_path, lambda raw: raw.update(files=["file_brain_AXT2_200_6002469"]))
+    with pytest.raises(ValueError, match="contrast"):
+        load_config(path)
