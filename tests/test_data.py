@@ -52,8 +52,8 @@ def test_box_lands_on_spot(fake_scan):
     (box,) = s.boxes
     inside = np.zeros(s.reference.shape, dtype=bool)
     inside[box.row : box.row + box.height, box.col : box.col + box.width] = True
-    # spot is +4 on a background between 1.0 and 1.3
-    assert s.reference[inside].min() > s.reference[~inside].max() + 3
+    # spot is +1 on tissue between 1.0 and 1.3, with dark background around the head
+    assert s.reference[inside].min() > s.reference[~inside].max() + 0.5
 
 
 def test_slices_argument(fake_scan):

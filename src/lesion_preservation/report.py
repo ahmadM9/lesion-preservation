@@ -51,11 +51,28 @@ def mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else math.nan
 
 
+def box_size(row: dict) -> int:
+    return max(int(row["box_height"]), int(row["box_width"]))
+
+
+def box_rate(rows: list[dict], unit: str, cfg: LesionsConfig) -> dict:
+    n_found = sum(r["found"] == "True" for r in rows)
+    return {
+        "unit": unit, "connectivity": "", "n": len(rows), "n_found": n_found,
+        "found_rate": n_found / len(rows) if rows else math.nan,
+        "n_large": sum(box_size(r) > cfg.large_box_px for r in rows),
+        "box_psnr": mean([float(r["box_psnr"]) for r in rows]),
+        "box_ssim": mean([float(r["box_ssim"]) for r in rows]),
+    }  # fmt: skip
+
+
 def found_rates(rows: list[dict], cfg: LesionsConfig) -> list[dict]:
-    boxes = boxes_of(rows)
-    box_size = {box.box_id: max(box.height, box.width) for _, _, box in boxes}
+    # a normal box keeps its lesion box's id, so only lesion rows enter the joining
+    lesion_rows = [r for r in rows if r["kind"] == "lesion"]
+    boxes = boxes_of(lesion_rows)
     found = {
-        (r["method"], float(r["speedup"]), int(r["box_id"])): r["found"] == "True" for r in rows
+        (r["method"], float(r["speedup"]), int(r["box_id"])): r["found"] == "True"
+        for r in lesion_rows
     }
     by_item: dict[tuple[str, float], list[dict]] = {}
     for r in rows:
@@ -85,19 +102,14 @@ def found_rates(rows: list[dict], cfg: LesionsConfig) -> list[dict]:
                     "box_psnr": "", "box_ssim": "",
                 })  # fmt: skip
             # per box: binned by its own longest side, so no grouping rule enters
-            in_bin = [
-                r for r in item_rows
-                if size_bin(box_size[int(r["box_id"])], cfg.size_upper_bounds) == name
-            ]  # fmt: skip
-            n_found = sum(r["found"] == "True" for r in in_bin)
-            out.append({
-                "method": method, "speedup": speedup, "unit": "box", "connectivity": "",
-                "size_bin": name, "n": len(in_bin), "n_found": n_found,
-                "found_rate": n_found / len(in_bin) if in_bin else math.nan,
-                "n_large": sum(box_size[int(r["box_id"])] > cfg.large_box_px for r in in_bin),
-                "box_psnr": mean([float(r["box_psnr"]) for r in in_bin]),
-                "box_ssim": mean([float(r["box_ssim"]) for r in in_bin]),
-            })  # fmt: skip
+            in_bin = [r for r in item_rows if size_bin(box_size(r), cfg.size_upper_bounds) == name]
+            # a normal box found is a false alarm of the judge
+            for unit, kind in (("box", "lesion"), ("normal_box", "normal")):
+                of_kind = [r for r in in_bin if r["kind"] == kind]
+                out.append(
+                    {"method": method, "speedup": speedup, "size_bin": name}
+                    | box_rate(of_kind, unit, cfg)
+                )
     return out
 
 

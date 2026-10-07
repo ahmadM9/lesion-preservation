@@ -46,6 +46,12 @@ def test_missing_lesions_key_fails(tmp_path):
         load_config(path)
 
 
+def test_missing_normal_boxes_key_fails(tmp_path):
+    path = write_changed(tmp_path, lambda raw: raw["normal_boxes"].pop("clearance_px"))
+    with pytest.raises(KeyError, match="clearance_px"):
+        load_config(path)
+
+
 def test_unknown_connectivity_fails(tmp_path):
     path = write_changed(tmp_path, lambda raw: raw["lesions"].update(connectivity=8))
     with pytest.raises(ValueError, match="6, 18 or 26"):

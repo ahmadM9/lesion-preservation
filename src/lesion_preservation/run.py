@@ -13,16 +13,17 @@ import torch
 import yaml
 
 from lesion_preservation.config import Config, load_config
-from lesion_preservation.data import load_slices
+from lesion_preservation.data import load_slices, with_neighbours
 from lesion_preservation.examples import save_example
 from lesion_preservation.judge import get_judge
 from lesion_preservation.masks import apply_mask, effective_speedup, get_mask
 from lesion_preservation.metrics import box_scores, nmse, psnr, ssim
+from lesion_preservation.normal import place_normal_boxes
 from lesion_preservation.recon import get_reconstructor
 
 COLUMNS = [
     "file", "slice", "box_id", "box_row", "box_col", "box_height", "box_width", "label",
-    "method", "speedup", "effective_speedup", "mask", "centre_fraction", "seed", "judge",
+    "kind", "method", "speedup", "effective_speedup", "mask", "centre_fraction", "seed", "judge",
     "found", "judge_score", "slice_psnr", "slice_ssim", "slice_nmse",
     "box_psnr", "box_ssim", "box_nmse", "recon_time",
 ]  # fmt: skip
@@ -125,7 +126,7 @@ def run(
         "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "none",
         "start": started.isoformat(timespec="seconds"),
     }
-    process(cfg, data_dir, labels_csv, run_dir)
+    session["normal_boxes_missing"] = process(cfg, data_dir, labels_csv, run_dir)
     session["end"] = datetime.now().isoformat(timespec="seconds")
     session["runtime"] = hms(perf_counter() - clock)
     session["peak_gpu_memory_mb"] = (
@@ -135,7 +136,8 @@ def run(
     return run_dir
 
 
-def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> None:
+def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> int:
+    # returns the number of lesion boxes left without a normal box
     results = run_dir / "results.csv"
     masks_path = run_dir / "masks.npz"
     done = done_items(results)
@@ -143,17 +145,27 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
     make_mask = get_mask(cfg.mask.name)
     methods = {name: get_reconstructor(name) for name in cfg.methods}
     judge = get_judge(cfg.judge.name, **cfg.judge.params)
+    missing = 0
 
     with open(results, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         if f.tell() == 0:
             writer.writeheader()
         for stem in cfg.files:
-            for s in load_slices(data_dir / f"{stem}.h5", labels_csv):
+            slices = load_slices(data_dir / f"{stem}.h5", labels_csv)
+            for s, neighbours in with_neighbours(slices, cfg.normal_boxes.fluid_reach_slices):
                 # only the config's lesion label is scored, not every label in the file
                 boxes = [b for b in s.boxes if b.label == cfg.lesions.label]
                 if not boxes:
                     continue
+                # placed on the reference once, so every speed-up and method scores the same boxes
+                normals = place_normal_boxes(
+                    s.reference, s.boxes, boxes, cfg.normal_boxes.seed,
+                    cfg.normal_boxes.brain_margin_px, cfg.normal_boxes.clearance_px,
+                    cfg.normal_boxes.max_dark_fraction, neighbours,
+                )  # fmt: skip
+                missing += len(boxes) - len(normals)
+                scored = [(box, "lesion") for box in boxes] + [(box, "normal") for box in normals]
                 data_range = float(s.reference.max())
                 for speedup in cfg.speedups:
                     # one mask per width, speed-up and seed; every method gets the same one
@@ -183,7 +195,8 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                             "recon_time": hms(recon_time, millis=True),
                         }  # fmt: skip
                         rows = []
-                        for box, verdict in zip(boxes, judge(image, boxes), strict=True):
+                        verdicts = judge(image, [box for box, _ in scored])
+                        for (box, kind), verdict in zip(scored, verdicts, strict=True):
                             scores = box_scores(s.reference, image, ssim_map, box, data_range)
                             rows.append(
                                 common
@@ -194,6 +207,7 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                                     "box_height": box.height,
                                     "box_width": box.width,
                                     "label": box.label,
+                                    "kind": kind,
                                     "found": verdict.found,
                                     "judge_score": verdict.score,
                                     "box_psnr": scores["psnr"],
@@ -205,10 +219,12 @@ def process(cfg: Config, data_dir: Path, labels_csv: Path, run_dir: Path) -> Non
                             save_example(
                                 s.reference, image, boxes, data_range, cfg.examples.scale,
                                 run_dir / "examples" / f"{stem}_s{s.index}_{speedup:g}x_{name}.png",
+                                normals,
                             )  # fmt: skip
                         # an item's rows go out together, so a crash loses one item at most
                         writer.writerows(rows)
                         f.flush()
+    return missing
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -39,6 +39,15 @@ class LesionsConfig:
 
 
 @dataclass(frozen=True)
+class NormalBoxesConfig:
+    seed: int
+    brain_margin_px: int
+    clearance_px: int
+    max_dark_fraction: float
+    fluid_reach_slices: int
+
+
+@dataclass(frozen=True)
 class Config:
     name: str
     files: tuple[str, ...]
@@ -49,6 +58,7 @@ class Config:
     ssim_window: int
     examples: ExamplesConfig
     lesions: LesionsConfig
+    normal_boxes: NormalBoxesConfig
 
 
 def _check_keys(section: dict, keys: set[str], where: str) -> None:
@@ -70,6 +80,9 @@ def load_config(path: str | Path) -> Config:
     _check_keys(raw["judge"], set(JudgeConfig.__dataclass_fields__), f"{path}: judge")
     _check_keys(raw["examples"], set(ExamplesConfig.__dataclass_fields__), f"{path}: examples")
     _check_keys(raw["lesions"], set(LesionsConfig.__dataclass_fields__), f"{path}: lesions")
+    _check_keys(
+        raw["normal_boxes"], set(NormalBoxesConfig.__dataclass_fields__), f"{path}: normal_boxes"
+    )
 
     cfg = Config(
         name=raw["name"],
@@ -83,6 +96,7 @@ def load_config(path: str | Path) -> Config:
         lesions=LesionsConfig(
             **raw["lesions"] | {"size_upper_bounds": tuple(raw["lesions"]["size_upper_bounds"])}
         ),
+        normal_boxes=NormalBoxesConfig(**raw["normal_boxes"]),
     )
     for key in ("connectivity", "connectivity_variant"):
         if getattr(cfg.lesions, key) not in (6, 18, 26):

@@ -39,12 +39,19 @@ def write_run(tmp_path: Path) -> Path:
             values = {
                 "file": file, "slice": index, "box_id": box_id, "box_row": row,
                 "box_col": col, "box_height": height, "box_width": width, "label": "x",
+                "kind": "lesion",
                 "method": "m", "speedup": speedup, "effective_speedup": speedup,
                 "found": speedup == 1 or box_id == 0, "slice_psnr": psnr,
                 "slice_ssim": 1.0 if speedup == 1 else 0.5, "slice_nmse": 0.0,
                 "box_psnr": psnr, "box_ssim": 1.0,
             }  # fmt: skip
             rows.append(dict.fromkeys(COLUMNS, "") | values)
+            # a normal box beside each lesion box, same id and size; found only at 1x
+            rows.append(
+                dict.fromkeys(COLUMNS, "")
+                | values
+                | {"box_col": col + 100, "label": "", "kind": "normal", "found": speedup == 1}
+            )
     with open(run_dir / "results.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
@@ -135,3 +142,12 @@ def test_smoke_run(fake_scan, tmp_path):
     lesion = pick(rows, 1, "lesion", "<=7", 26)
     assert (lesion["n"], lesion["found_rate"]) == ("1", "1.0")
     assert (out / "report_zero_filled.png").exists()
+
+
+def test_normal_boxes_kept_apart(reported):
+    _, out = reported
+    rows = read(out / "found_rates.csv")
+    # same size bins as the lesion boxes, none found at 2x; the lesion tables above are unchanged
+    normal = pick(rows, 2, "normal_box", "<=7")
+    assert (normal["n"], normal["n_found"]) == ("5", "0")
+    assert pick(rows, 1, "normal_box", ">16")["found_rate"] == "1.0"

@@ -46,10 +46,16 @@ def fake_coil_maps(num_coils, rows, cols):
 def fake_scan(tmp_path):
     num_slices, num_coils, rows, cols = FAKE_SHAPE
     r, c = np.mgrid[:rows, :cols]
-    images = np.repeat((1.0 + 0.2 * r / rows + 0.1 * c / cols)[None], num_slices, axis=0)
-    top = SPOT[0] + (rows - FAKE_CROP[0]) // 2
-    left = SPOT[1] + (cols - FAKE_CROP[1]) // 2
-    images[SPOT_SLICE, top : top + SPOT[2], left : left + SPOT[3]] += 4.0
+    tissue = 1.0 + 0.2 * r / rows + 0.1 * c / cols
+    # dark outside a head that ends one pixel inside the crop, so a brain mask has an edge
+    first_row, first_col = (rows - FAKE_CROP[0]) // 2, (cols - FAKE_CROP[1]) // 2
+    head = np.zeros((rows, cols), dtype=bool)
+    head[
+        first_row + 1 : first_row + FAKE_CROP[0] - 1, first_col + 1 : first_col + FAKE_CROP[1] - 1
+    ] = True
+    images = np.repeat(np.where(head, tissue, 0.0)[None], num_slices, axis=0)
+    top, left = SPOT[0] + first_row, SPOT[1] + first_col
+    images[SPOT_SLICE, top : top + SPOT[2], left : left + SPOT[3]] += 1.0
 
     kspace = fft2c(images[:, None] * fake_coil_maps(num_coils, rows, cols)).astype(np.complex64)
     stored = center_crop(rss(ifft2c(kspace), coil_axis=1), FAKE_CROP).astype(np.float32)

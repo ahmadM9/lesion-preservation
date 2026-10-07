@@ -26,3 +26,16 @@ lesions:
   size_upper_bounds: [7, 16]
   # about the 90th percentile of the longest box side; flagged, not dropped
   large_box_px: 51
+# one box per lesion box, same size and slice, inside the brain mask and clear of every label
+normal_boxes:
+  seed: 0
+  # erosion of the head mask, to take off the scalp; set by eye on real slices
+  brain_margin_px: 10
+  # gap to the brain edge and to other boxes; at least the judge's ring width
+  clearance_px: 2
+  # largest share of box pixels at or below the otsu threshold (fluid, background); lesion
+  # boxes on the 9 pilot files exceed 0.25 once in 98 (DECISIONS.md 2026-10-06)
+  max_dark_fraction: 0.25
+  # slices on each side whose dark pixels also count: a thick slice grazing a ventricle shows
+  # its fluid as grey, the next slice shows it dark (DECISIONS.md 2026-10-07)
+  fluid_reach_slices: 1

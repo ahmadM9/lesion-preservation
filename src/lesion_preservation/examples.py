@@ -8,6 +8,7 @@ from lesion_preservation.data import Box
 
 # outline colour only; it changes no result
 BOX_COLOUR = (255, 0, 0)
+NORMAL_COLOUR = (0, 255, 0)
 
 
 def to_grey(image: np.ndarray, data_range: float) -> np.ndarray:
@@ -22,6 +23,7 @@ def save_example(
     data_range: float,
     scale: int,
     path: str | Path,
+    normal_boxes: Sequence[Box] = (),
 ) -> None:
     # reference on the left, reconstruction on the right, each with its box outlines
     grey = np.concatenate([to_grey(reference, data_range), to_grey(image, data_range)], axis=1)
@@ -32,13 +34,14 @@ def save_example(
     draw = ImageDraw.Draw(picture)
     width = reference.shape[1]
     for offset in (0, width):
-        for box in boxes:
-            left = (box.col + offset) * scale
-            top = box.row * scale
-            # one pixel outside the box, so the lesion pixels stay visible
-            draw.rectangle(
-                (left - 1, top - 1, left + box.width * scale, top + box.height * scale),
-                outline=BOX_COLOUR,
-            )
+        for colour, group in ((BOX_COLOUR, boxes), (NORMAL_COLOUR, normal_boxes)):
+            for box in group:
+                left = (box.col + offset) * scale
+                top = box.row * scale
+                # one pixel outside the box, so the lesion pixels stay visible
+                draw.rectangle(
+                    (left - 1, top - 1, left + box.width * scale, top + box.height * scale),
+                    outline=colour,
+                )
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     picture.save(path)

@@ -25,19 +25,21 @@ def smoke_run(fake_scan, tmp_path):
     return run_dir, h5_path, csv_path
 
 
-def test_fake_scan_gives_one_row_per_speedup(smoke_run):
+def test_fake_scan_gives_two_rows_per_speedup(smoke_run):
     run_dir, _, _ = smoke_run
     rows = read_rows(run_dir)
-    assert len(rows) == 4
+    # the lesion box and its normal box
+    assert len(rows) == 8
     assert list(rows[0]) == COLUMNS
+    assert sorted(r["kind"] for r in rows) == ["lesion"] * 4 + ["normal"] * 4
     assert {r["file"] for r in rows} == {FAKE_STEM}
     assert {int(r["slice"]) for r in rows} == {SPOT_SLICE}
-    assert sorted(float(r["speedup"]) for r in rows) == [1, 2, 4, 8]
+    assert sorted({float(r["speedup"]) for r in rows}) == [1, 2, 4, 8]
 
 
 def test_full_scan_row(smoke_run):
     run_dir, _, _ = smoke_run
-    (row,) = [r for r in read_rows(run_dir) if float(r["speedup"]) == 1]
+    (row,) = [r for r in read_rows(run_dir) if float(r["speedup"]) == 1 and r["kind"] == "lesion"]
     assert row["found"] == "True"
     assert math.isinf(float(row["slice_psnr"]))
     assert float(row["effective_speedup"]) == 1
@@ -62,10 +64,11 @@ def test_same_run_twice_fails(smoke_run, tmp_path):
 def test_resume_writes_only_missing_items(smoke_run):
     run_dir, h5_path, csv_path = smoke_run
     lines = (run_dir / "results.csv").read_text().splitlines(keepends=True)
-    (run_dir / "results.csv").write_text("".join(lines[:-1]))
+    # the last item, its lesion row and its normal row, as a crash would lose it
+    (run_dir / "results.csv").write_text("".join(lines[:-2]))
     run(SMOKE, h5_path.parent, csv_path, resume=run_dir)
     rows = read_rows(run_dir)
-    assert len(rows) == 4
+    assert len(rows) == 8
     assert len({r["speedup"] for r in rows}) == 4
     assert len(yaml.safe_load((run_dir / "run_record.yaml").read_text())) == 2
 
@@ -125,5 +128,21 @@ def test_other_labels_not_scored(fake_scan, tmp_path):
     other = lines[-1].replace("Nonspecific white matter lesion", "Posttreatment change")
     csv_path.write_text("\n".join([*lines, other]) + "\n")
     rows = read_rows(run(SMOKE, h5_path.parent, csv_path, runs_dir=tmp_path / "runs"))
-    assert len(rows) == 4
-    assert {r["label"] for r in rows} == {"Nonspecific white matter lesion"}
+    assert len(rows) == 8
+    assert {r["label"] for r in rows if r["kind"] == "lesion"} == {
+        "Nonspecific white matter lesion"
+    }
+
+
+def test_normal_box_matches_its_lesion_box(smoke_run):
+    run_dir, _, _ = smoke_run
+    rows = read_rows(run_dir)
+    lesion = next(r for r in rows if r["kind"] == "lesion")
+    normal = next(r for r in rows if r["kind"] == "normal")
+    assert normal["box_id"] == lesion["box_id"]
+    for key in ("box_height", "box_width"):
+        assert normal[key] == lesion[key]
+    assert (normal["box_row"], normal["box_col"]) != (lesion["box_row"], lesion["box_col"])
+    assert normal["label"] == ""
+    (session,) = yaml.safe_load((run_dir / "run_record.yaml").read_text())
+    assert session["normal_boxes_missing"] == 0

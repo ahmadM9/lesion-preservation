@@ -1,5 +1,5 @@
 import csv
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -46,6 +46,25 @@ def read_boxes(csv_path: str | Path, file_stem: str, num_rows: int) -> dict[int,
             box = Box(box_id, row, int(line["x"]), height, int(line["width"]), line["label"])
             boxes.setdefault(int(line["slice"]), []).append(box)
     return boxes
+
+
+def with_neighbours(slices: Iterable[Slice], reach: int) -> Iterator[tuple[Slice, list]]:
+    # each slice with the references of up to reach slices on either side; reads ahead by reach
+    ahead: list[Slice] = []
+    references: dict[int, np.ndarray] = {}
+
+    def neighbours(s: Slice) -> list[np.ndarray]:
+        near = range(s.index - reach, s.index + reach + 1)
+        return [references[i] for i in near if i != s.index and i in references]
+
+    for s in slices:
+        references[s.index] = s.reference
+        ahead.append(s)
+        if len(ahead) > reach:
+            current = ahead.pop(0)
+            yield current, neighbours(current)
+    for current in ahead:
+        yield current, neighbours(current)
 
 
 def load_slices(
